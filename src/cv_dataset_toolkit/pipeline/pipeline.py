@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from typing import Self, overload
 
+from cv_dataset_toolkit.core.protocols import RecordSource
 from cv_dataset_toolkit.core.record import ImageRecord
 from cv_dataset_toolkit.pipeline.transforms import Transform
 
@@ -43,13 +45,13 @@ class Pipeline:
     def __init__(self, steps: Iterable[Transform] = ()) -> None:
         self._steps: tuple[Transform, ...] = tuple(steps)
 
-    def then(self, step: Transform) -> Pipeline:
+    def then(self, step: Transform) -> Self:
         """Return a *new* Pipeline with `step` appended. Does not mutate `self`."""
-        return Pipeline((*self._steps, step))
+        return type(self)((*self._steps, step))
 
     def run(
         self,
-        records: Iterable[ImageRecord],
+        records: RecordSource,
         stats: PipelineStats | None = None,
     ) -> Iterator[ImageRecord]:
         """Yield records that survive every step, in order.
@@ -84,6 +86,10 @@ class Pipeline:
         steps_repr = " | ".join(repr(step) for step in self._steps)
         return f"Pipeline({steps_repr})" if steps_repr else "Pipeline()"
 
+    @overload
+    def __or__(self, other: Transform) -> Pipeline: ...
+    @overload
+    def __or__(self, other: Pipeline) -> Pipeline: ...
     def __or__(self, other: Transform | Pipeline) -> Pipeline:
         if isinstance(other, Pipeline):
             return Pipeline((*self._steps, *other._steps))

@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 import csv
-import os
-from collections.abc import Iterable
-from typing import Any
+from collections.abc import Iterable, Mapping
+from typing import Final
 
-MANIFEST_FIELDS = ("path", "label", "format", "size_bytes", "width", "height")
+from cv_dataset_toolkit.core.types import PathLike
+
+MANIFEST_FIELDS: Final[tuple[str, ...]] = (
+    "path",
+    "label",
+    "format",
+    "size_bytes",
+    "width",
+    "height",
+)
 
 
-def write_manifest_csv(records: Iterable[dict[str, Any]], out_path: str | os.PathLike[str]) -> int:
+def write_manifest_csv(records: Iterable[Mapping[str, object]], out_path: PathLike) -> int:
     """Write `records` to `out_path` as CSV, one row at a time.
 
     Consumes `records` (a generator) lazily via `csv.DictWriter.writerow`

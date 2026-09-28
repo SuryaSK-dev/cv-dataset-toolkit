@@ -12,12 +12,17 @@ import os
 from collections.abc import Iterable, Iterator
 from itertools import chain, filterfalse
 from pathlib import Path
+from typing import Final
 
-DEFAULT_IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"})
+from cv_dataset_toolkit.core.types import PathLike
+
+DEFAULT_IMAGE_EXTENSIONS: Final[frozenset[str]] = frozenset(
+    {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
+)
 
 
 def iter_image_paths(
-    root: str | os.PathLike[str],
+    root: PathLike,
     extensions: frozenset[str] = DEFAULT_IMAGE_EXTENSIONS,
 ) -> Iterator[Path]:
     """Yield image file paths under `root`, recursively, in scandir order.
@@ -43,7 +48,7 @@ def iter_image_paths(
 
 
 def iter_many_roots(
-    *roots: str | os.PathLike[str],
+    *roots: PathLike,
     extensions: frozenset[str] = DEFAULT_IMAGE_EXTENSIONS,
 ) -> Iterator[Path]:
     """Chain `iter_image_paths` over several dataset roots as one lazy stream.

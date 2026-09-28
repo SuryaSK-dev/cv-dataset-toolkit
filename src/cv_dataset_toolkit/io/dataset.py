@@ -23,10 +23,10 @@ supports that, while a bare generator would not.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
+from cv_dataset_toolkit.core.types import PathLike
 from cv_dataset_toolkit.io.walker import DEFAULT_IMAGE_EXTENSIONS, iter_image_paths
 
 
@@ -42,7 +42,7 @@ class ImageFolder:
 
     def __init__(
         self,
-        root: str | os.PathLike[str],
+        root: PathLike,
         extensions: frozenset[str] = DEFAULT_IMAGE_EXTENSIONS,
     ) -> None:
         self.root = Path(root)

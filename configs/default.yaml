@@ -1,0 +1,13 @@
+# Default cv-dataset-toolkit scan configuration.
+# Precedence when loaded via `--config`: this file < CVTK_* env vars < CLI flags.
+root: sample_data
+formats:
+  - JPEG
+  - PNG
+min_size: [16, 16]
+dedupe: false
+batch_size: 8
+limit: null
+output:
+  path: manifest.csv
+  format: csv

@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "OutputConfig": {
+      "additionalProperties": false,
+      "description": "Where and how a scan's manifest is written.",
+      "properties": {
+        "path": {
+          "format": "path",
+          "title": "Path",
+          "type": "string"
+        },
+        "format": {
+          "default": "csv",
+          "enum": [
+            "csv",
+            "jsonl"
+          ],
+          "title": "Format",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "OutputConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The full, validated configuration for a `scan` run.\n\nFrozen so a loaded config can't be accidentally mutated after\nvalidation; `extra=\"forbid\"` so a typo'd key in a YAML file (or an\nunexpected CLI override key) fails loudly instead of being silently\nignored.",
+  "properties": {
+    "root": {
+      "format": "directory-path",
+      "title": "Root",
+      "type": "string"
+    },
+    "formats": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Formats",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "min_size": {
+      "anyOf": [
+        {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Min Size"
+    },
+    "dedupe": {
+      "default": false,
+      "title": "Dedupe",
+      "type": "boolean"
+    },
+    "batch_size": {
+      "default": 32,
+      "exclusiveMinimum": 0,
+      "title": "Batch Size",
+      "type": "integer"
+    },
+    "limit": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Limit"
+    },
+    "output": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OutputConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "root"
+  ],
+  "title": "PipelineConfig",
+  "type": "object"
+}

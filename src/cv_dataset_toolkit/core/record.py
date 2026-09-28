@@ -10,12 +10,12 @@ pipeline steps, batches, and threads without defensive copying.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from PIL import Image
+
+from cv_dataset_toolkit.core.types import PathLike
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +26,11 @@ class ImageRecord:
     size_bytes: int
     width: int
     height: int
-    extras: dict[str, Any] = field(default_factory=dict)
+    # `object`, not `Any`: transforms attach heterogeneous derived values here
+    # (Day 3's aspect_bucket is a str, a future one might add a float or
+    # bool). `object` still forces callers to narrow the type before using a
+    # value, unlike `Any`, which would silently allow anything.
+    extras: dict[str, object] = field(default_factory=dict)
 
     @property
     def aspect_ratio(self) -> float:
@@ -37,7 +41,7 @@ class ImageRecord:
         return (self.width * self.height) / 1_000_000
 
     @classmethod
-    def from_path(cls, path: str | os.PathLike[str]) -> ImageRecord:
+    def from_path(cls, path: PathLike) -> ImageRecord:
         """Build a record by reading only the image header (no pixel decode).
 
         Propagates `OSError`/`PIL.UnidentifiedImageError` for unreadable
@@ -57,8 +61,8 @@ class ImageRecord:
             height=height,
         )
 
-    def to_dict(self) -> dict[str, Any]:
-        base = {
+    def to_dict(self) -> dict[str, object]:
+        base: dict[str, object] = {
             "path": self.path,
             "label": self.label,
             "format": self.format,

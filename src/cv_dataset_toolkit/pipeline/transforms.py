@@ -12,9 +12,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from cv_dataset_toolkit.core.record import ImageRecord
+from cv_dataset_toolkit.core.types import AspectBucket
 
 if TYPE_CHECKING:
     from cv_dataset_toolkit.pipeline.pipeline import Pipeline
@@ -38,7 +39,11 @@ class Transform(ABC):
     def __repr__(self) -> str:
         return f"{self.name}()"
 
-    def __or__(self, other: Transform) -> Pipeline:
+    @overload
+    def __or__(self, other: Transform) -> Pipeline: ...
+    @overload
+    def __or__(self, other: Pipeline) -> Pipeline: ...
+    def __or__(self, other: Transform | Pipeline) -> Pipeline:
         from cv_dataset_toolkit.pipeline.pipeline import Pipeline
 
         return Pipeline([self]) | other
@@ -104,6 +109,7 @@ class AddAspectBucket(Mapper):
     """Tag each record's `extras["aspect_bucket"]` as portrait/landscape/square."""
 
     def map(self, record: ImageRecord) -> ImageRecord:
+        bucket: AspectBucket
         ratio = record.aspect_ratio
         if ratio > 1.05:
             bucket = "landscape"

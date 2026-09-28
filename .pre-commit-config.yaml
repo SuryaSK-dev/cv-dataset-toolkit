@@ -5,3 +5,11 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict
+        entry: .venv/Scripts/python.exe -m mypy --strict src/
+        language: system
+        pass_filenames: false
+        files: ^src/

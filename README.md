@@ -22,7 +22,7 @@ cv-dataset-toolkit scan ./datasets/sample
 | 1   | Env Setup                     | ✅     | day-01  |
 | 2   | Iterators & Generators        | ✅     | day-02  |
 | 3   | OOP / Pipeline                | ✅     | day-03  |
-| 4   | Type Hints / Pydantic         | ⬜     |         |
+| 4   | Type Hints / Pydantic         | ✅     | day-04  |
 | 5   | Decorators / Context Managers | ⬜     |         |
 | 6   | Exceptions                    | ⬜     |         |
 | 7   | Logging                       | ⬜     |         |
@@ -36,35 +36,79 @@ cv-dataset-toolkit/
 ├── src/
 │   └── cv_dataset_toolkit/
 │       ├── __init__.py
+│       ├── py.typed             # PEP 561 marker: this package ships type hints
 │       ├── cli.py
 │       ├── core/
 │       │   ├── __init__.py
 │       │   ├── record.py        # ImageRecord: frozen, slotted dataclass
 │       │   ├── metadata.py      # iter_metadata: streaming metadata extraction
-│       │   └── stats.py         # running_stats: send()-based coroutine
+│       │   ├── stats.py         # running_stats: send()-based coroutine, StatsSnapshot
+│       │   ├── types.py         # TypeAlias: PathLike, OutputFormat, AspectBucket
+│       │   └── protocols.py     # RecordSource (Protocol)
+│       ├── config/
+│       │   ├── __init__.py
+│       │   ├── models.py        # OutputConfig, PipelineConfig (Pydantic v2)
+│       │   └── loader.py        # load_config: YAML + env + CLI precedence
 │       ├── io/
 │       │   ├── __init__.py
 │       │   ├── walker.py        # iter_image_paths, iter_many_roots
 │       │   ├── dataset.py       # ImageFolder, ImageFolderIterator
 │       │   ├── export.py        # write_manifest_csv
-│       │   └── exporters.py     # Exporter ABC: CSVExporter, JSONLinesExporter
+│       │   ├── exporters.py     # Exporter ABC: CSVExporter, JSONLinesExporter
+│       │   └── manifest.py      # ManifestRow (Pydantic), validate_manifest_csv
 │       ├── pipeline/
 │       │   ├── __init__.py
 │       │   ├── transforms.py    # Transform/Filter/Mapper ABCs + concrete transforms
-│       │   └── pipeline.py      # Pipeline (composable via | and .then()), PipelineStats
+│       │   ├── pipeline.py      # Pipeline (composable via | and .then()), PipelineStats
+│       │   └── factory.py       # build_pipeline(config) -> Pipeline
 │       └── utils/
 │           ├── __init__.py
 │           └── iterutils.py     # batched, take, count_by_label
+├── configs/
+│   └── default.yaml             # committed default scan configuration
+├── docs/
+│   └── config.schema.json       # PipelineConfig.model_json_schema()
 ├── scripts/
 │   ├── make_sample_dataset.py
 │   ├── day02_memory_demo.py
-│   └── day03_pipeline_demo.py
+│   ├── day03_pipeline_demo.py
+│   ├── day04_types_demo.py
+│   └── export_schema.py
 ├── pyproject.toml
 ├── Makefile
 ├── .pre-commit-config.yaml
 ├── .gitignore
 └── README.md
 ```
+
+## Configuration
+
+`scan` is driven by a `PipelineConfig` (validated with Pydantic v2), merged in
+increasing priority:
+
+```
+model defaults  <  YAML file (--config)  <  CVTK_* env vars  <  CLI flags
+```
+
+Example (`configs/default.yaml`):
+
+```yaml
+root: sample_data
+formats: [JPEG, PNG]
+min_size: [16, 16]
+dedupe: false
+batch_size: 8
+limit: null
+output:
+  path: manifest.csv
+  format: csv
+```
+
+Supported environment variables (scalar fields only — `formats`, `min_size`,
+and `output` stay YAML/CLI-only): `CVTK_ROOT`, `CVTK_BATCH_SIZE`,
+`CVTK_LIMIT`, `CVTK_DEDUPE`. The full schema is in
+[`docs/config.schema.json`](docs/config.schema.json), regenerated with
+`make schema`.
 
 ## Day-by-Day Log
 
@@ -148,3 +192,36 @@ cv-dataset-toolkit/
   python scripts/day03_pipeline_demo.py
   ```
 - **Milestone tag:** `day-03`
+
+### Day 4 — Type Hints / Pydantic
+
+- **Goal:** Make the codebase pass `mypy --strict` with zero errors, and validate everything that enters from outside with Pydantic v2.
+- **What I built:**
+  - Full strict typing: `collections.abc` generics, `TypeVar`s, `Generator[YieldT, SendT, ReturnT]` for `running_stats`, `Literal`/`TypeAlias`/`Final`, `Self` on `Pipeline.then()`, `@overload` on `Transform`/`Pipeline.__or__`, and a `RecordSource` `Protocol`
+  - `PipelineConfig`/`OutputConfig` (Pydantic v2, frozen, `extra="forbid"`) with a `field_validator` normalizing/validating `formats` and a `model_validator` auto-correcting the output suffix to match `output.format`
+  - `load_config()`: explicit precedence — model defaults < YAML file < `CVTK_*` env vars (via `pydantic-settings`) < CLI flags
+  - `build_pipeline(config) -> Pipeline` factory; the CLI no longer wires transforms by hand
+  - `ManifestRow` (Pydantic) + `validate_manifest_csv()`: streams a manifest CSV row-by-row, collecting `(row_number, error)` pairs without loading the file; new `validate-manifest` CLI command
+  - `mypy --strict` wired into `make typecheck` and a local pre-commit hook; `py.typed` marker added
+- **Key concepts:**
+  - Strict typing & generics: `TypeVar`-based `batched`/`take`, a `TypedDict` (`StatsSnapshot`) instead of `dict[str, Any]` for the coroutine's yield type
+  - Protocol vs ABC: `Transform` is nominal (must inherit); `RecordSource` is structural (any object with a matching `__iter__` qualifies) — see its docstring
+  - Pydantic validators at the boundaries: dataclasses (`ImageRecord`) stay fast and trusted inside the pipeline; Pydantic models validate config and on-disk manifests, the only places untrusted data enters
+  - Config precedence: each layer (YAML/env/CLI) only contributes the fields it actually set, so a lower layer's value survives untouched when a higher layer is silent
+- **How to run / verify:**
+  ```bash
+  pip install -e ".[dev]"
+  mypy --strict src/
+  ruff check .
+  cv-dataset-toolkit scan sample_data --out manifest.csv
+  cv-dataset-toolkit scan --config configs/default.yaml
+  CVTK_BATCH_SIZE=2 cv-dataset-toolkit scan --config configs/default.yaml
+  # PowerShell equivalent: $env:CVTK_BATCH_SIZE=2; cv-dataset-toolkit scan --config configs/default.yaml
+  cv-dataset-toolkit scan --config configs/default.yaml --batch-size 3
+  cv-dataset-toolkit scan sample_data --batch-size 0   # exit code 2, validation error
+  cv-dataset-toolkit validate-manifest manifest.csv
+  cv-dataset-toolkit scan sample_data --limit 3
+  python scripts/day04_types_demo.py
+  make schema
+  ```
+- **Milestone tag:** `day-04`

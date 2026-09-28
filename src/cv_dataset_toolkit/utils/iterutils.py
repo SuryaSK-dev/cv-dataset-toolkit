@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from itertools import chain, islice
-from typing import Any, TypeVar
+from typing import TypeVar
+
+from cv_dataset_toolkit.core.record import ImageRecord
 
 T = TypeVar("T")
 
@@ -31,7 +33,7 @@ def take(iterable: Iterable[T], n: int) -> list[T]:
     return list(islice(iterable, n))
 
 
-def count_by_label(records: Iterable[dict[str, Any]]) -> Counter[str]:
+def count_by_label(records: Iterable[ImageRecord]) -> Counter[str]:
     """Stream through metadata records, tallying counts per `label`.
 
     A single `Counter` accumulates as records are consumed one at a time —
@@ -40,7 +42,7 @@ def count_by_label(records: Iterable[dict[str, Any]]) -> Counter[str]:
     """
     counts: Counter[str] = Counter()
     for record in records:
-        counts[record["label"]] += 1
+        counts[record.label] += 1
     return counts
 
 

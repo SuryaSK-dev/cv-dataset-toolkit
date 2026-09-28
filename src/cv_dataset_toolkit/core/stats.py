@@ -10,7 +10,7 @@ Usage:
     stats = running_stats()
     next(stats)               # priming: advances to the first `yield`,
                                # required before the first real .send()
-    stats.send(record)        # returns a live snapshot dict
+    stats.send(record)        # returns a live snapshot
     ...
     stats.close()             # ends the coroutine; further .send() raises
                                # StopIteration
@@ -19,19 +19,27 @@ Usage:
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Any
+from typing import TypedDict
 
 from cv_dataset_toolkit.core.record import ImageRecord
 
 
-def running_stats() -> Generator[dict[str, Any], ImageRecord, None]:
+class StatsSnapshot(TypedDict):
+    count: int
+    mean_width: float
+    mean_height: float
+    min_size_bytes: int | None
+    max_size_bytes: int | None
+
+
+def running_stats() -> Generator[StatsSnapshot, ImageRecord, None]:
     count = 0
     width_sum = 0
     height_sum = 0
     min_size: int | None = None
     max_size: int | None = None
 
-    snapshot: dict[str, Any] = {
+    snapshot: StatsSnapshot = {
         "count": 0,
         "mean_width": 0.0,
         "mean_height": 0.0,
