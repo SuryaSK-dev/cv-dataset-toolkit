@@ -11,5 +11,7 @@ dist/
 .coverage
 htmlcov/
 datasets/
+sample_data/
+manifest.csv
 *.log
 .env
