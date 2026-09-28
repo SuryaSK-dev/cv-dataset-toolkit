@@ -19,7 +19,10 @@ def write_manifest_csv(records: Iterable[dict[str, Any]], out_path: str | os.Pat
     """
     row_count = 0
     with open(out_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=MANIFEST_FIELDS)
+        # extrasaction="ignore": records may carry extra keys (e.g. a
+        # transform's `extras`, like Day 3's aspect_bucket) that this fixed
+        # column set doesn't export.
+        writer = csv.DictWriter(f, fieldnames=MANIFEST_FIELDS, extrasaction="ignore")
         writer.writeheader()
         for record in records:
             writer.writerow(record)

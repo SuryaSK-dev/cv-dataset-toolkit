@@ -21,8 +21,10 @@ from __future__ import annotations
 from collections.abc import Generator
 from typing import Any
 
+from cv_dataset_toolkit.core.record import ImageRecord
 
-def running_stats() -> Generator[dict[str, Any], dict[str, Any], None]:
+
+def running_stats() -> Generator[dict[str, Any], ImageRecord, None]:
     count = 0
     width_sum = 0
     height_sum = 0
@@ -41,9 +43,9 @@ def running_stats() -> Generator[dict[str, Any], dict[str, Any], None]:
         while True:
             record = yield snapshot
             count += 1
-            width_sum += record["width"]
-            height_sum += record["height"]
-            size = record["size_bytes"]
+            width_sum += record.width
+            height_sum += record.height
+            size = record.size_bytes
             min_size = size if min_size is None else min(min_size, size)
             max_size = size if max_size is None else max(max_size, size)
 

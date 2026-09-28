@@ -13,5 +13,8 @@ htmlcov/
 datasets/
 sample_data/
 manifest.csv
+manifest.jsonl
+manifest*.csv
+manifest*.jsonl
 *.log
 .env
