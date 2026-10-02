@@ -16,6 +16,7 @@ from pathlib import Path
 from PIL import Image
 
 from cv_dataset_toolkit.core.types import PathLike
+from cv_dataset_toolkit.utils.decorators import retry
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,12 +42,14 @@ class ImageRecord:
         return (self.width * self.height) / 1_000_000
 
     @classmethod
+    @retry(attempts=3, delay=0.01, backoff=2.0, exceptions=(OSError,))
     def from_path(cls, path: PathLike) -> ImageRecord:
         """Build a record by reading only the image header (no pixel decode).
 
-        Propagates `OSError`/`PIL.UnidentifiedImageError` for unreadable
-        files — callers that want to skip-and-count (like `iter_metadata`)
-        catch those around this call.
+        Retries transient `OSError` failures up to 3 times with exponential backoff.
+        Transient filesystem locks, network storage contention (NFS/SMB), or sync
+        services (OneDrive/Dropbox) can momentarily block file descriptors during
+        rapid scanning; retrying handles transient sharing violations gracefully.
         """
         path = Path(path)
         with Image.open(path) as img:

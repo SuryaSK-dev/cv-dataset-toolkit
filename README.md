@@ -23,7 +23,7 @@ cv-dataset-toolkit scan ./datasets/sample
 | 2   | Iterators & Generators        | ✅     | day-02  |
 | 3   | OOP / Pipeline                | ✅     | day-03  |
 | 4   | Type Hints / Pydantic         | ✅     | day-04  |
-| 5   | Decorators / Context Managers | ⬜     |         |
+| 5   | Decorators / Context Managers | ✅     | day-05  |
 | 6   | Exceptions                    | ⬜     |         |
 | 7   | Logging                       | ⬜     |         |
 | 8   | SOLID Refactor                | ⬜     |         |
@@ -54,7 +54,7 @@ cv-dataset-toolkit/
 │       │   ├── walker.py        # iter_image_paths, iter_many_roots
 │       │   ├── dataset.py       # ImageFolder, ImageFolderIterator
 │       │   ├── export.py        # write_manifest_csv
-│       │   ├── exporters.py     # Exporter ABC: CSVExporter, JSONLinesExporter
+│       │   ├── exporters.py     # Exporter ABC: CSVExporter, JSONLinesExporter, MultiExporter
 │       │   └── manifest.py      # ManifestRow (Pydantic), validate_manifest_csv
 │       ├── pipeline/
 │       │   ├── __init__.py
@@ -63,6 +63,8 @@ cv-dataset-toolkit/
 │       │   └── factory.py       # build_pipeline(config) -> Pipeline
 │       └── utils/
 │           ├── __init__.py
+│           ├── contexts.py      # timer, Stopwatch, atomic_write, temporary_env, multi_atomic_write
+│           ├── decorators.py    # @timed, @retry, @memoize, @deprecated, TimingRegistry
 │           └── iterutils.py     # batched, take, count_by_label
 ├── configs/
 │   └── default.yaml             # committed default scan configuration
@@ -73,6 +75,7 @@ cv-dataset-toolkit/
 │   ├── day02_memory_demo.py
 │   ├── day03_pipeline_demo.py
 │   ├── day04_types_demo.py
+│   ├── day05_decorators_demo.py
 │   └── export_schema.py
 ├── pyproject.toml
 ├── Makefile
@@ -225,3 +228,40 @@ and `output` stay YAML/CLI-only): `CVTK_ROOT`, `CVTK_BATCH_SIZE`,
   make schema
   ```
 - **Milestone tag:** `day-04`
+
+### Day 5 — Decorators / Context Managers
+
+- **Goal:** Implement reusable, strictly typed decorators and context managers for performance telemetry, transient error retry, LRU caching, deprecation, atomic file writes, and environment isolation.
+- **What I built:**
+  - `@timed` & `TimingRegistry`: tracks call count, total, mean, and max wall time via `time.perf_counter()`; handles generator functions by timing lazy iteration rather than initial instantiation; wired into pipeline stages with the new `--timings` CLI flag
+  - `@retry(attempts, delay, backoff, exceptions)`: decorator factory with exponential backoff, re-raising the last exception on exhaustion; applied to `ImageRecord.from_path()` to recover from transient filesystem/network sharing locks
+  - `@memoize(maxsize)`: LRU cache using `collections.OrderedDict` with `.cache_info()` and `.cache_clear()`; explicitly handles unhashable arguments with a descriptive `TypeError`
+  - `@deprecated(reason)`: emits `DeprecationWarning` with `stacklevel=2` attributing the warning to the caller line; applied to the superseded `write_manifest_csv` helper
+  - `timer(label)`: `@contextlib.contextmanager` ensuring elapsed time is printed in a `try/finally` block even if the body raises
+  - `Stopwatch`: class-based context manager exposing `.elapsed` both during live execution and after exit; wired into the `scan` CLI summary line
+  - `atomic_write(path, mode="w", encoding="utf-8")`: writes to a staging file in the target directory and replaces atomically via `os.replace` on success, cleaning up on error; used in `CSVExporter`, `JSONLinesExporter`, and `write_manifest_csv`
+  - `temporary_env(**vars)`: context manager setting or unsetting environment variables and restoring original values on exit
+  - `multi_atomic_write` & `MultiExporter`: uses `contextlib.ExitStack` to manage multiple atomic file writers simultaneously
+  - `scripts/day05_decorators_demo.py`: comprehensive runnable demo verifying all decorators, context managers, and failure paths
+- **Key concepts:**
+  - Plain decorator (`Callable[P, R] -> Callable[P, R]`) vs. decorator factory (`*args -> Callable[[Callable[P, R]], Callable[P, R]]`) vs. class-based decorator (`__call__` + descriptor protocol `__get__`)
+  - `functools.wraps` preserves `__name__`, `__doc__`, `__annotations__`, and `__wrapped__`, enabling introspection and generator detection
+  - Generator timing pitfall: naive decorators measure only generator object creation; wrapping `yield from` measures actual lazy consumption time
+  - Context managers: generator-based (`@contextlib.contextmanager`) vs class-based (`__enter__`/`__exit__`); resource cleanup via `try/finally`
+  - Atomic file writes: staging in `.tmp` files in the same directory before `os.replace()` avoids corrupted or partial files on crash or cancellation
+  - `contextlib.ExitStack`: coordinates dynamic sets of context managers cleanly unwinding them in LIFO order
+- **How to run / verify:**
+  ```bash
+  pip install -e ".[dev]"
+  ruff check .
+  ruff format --check .
+  mypy --strict src/
+  python scripts/make_sample_dataset.py
+  cv-dataset-toolkit scan sample_data --out manifest.csv --timings
+  cv-dataset-toolkit scan sample_data --format jsonl --out manifest.jsonl
+  cv-dataset-toolkit validate-manifest manifest.csv
+  python scripts/day05_decorators_demo.py
+  python scripts/day04_types_demo.py
+  ```
+- **Milestone tag:** `day-05`
+

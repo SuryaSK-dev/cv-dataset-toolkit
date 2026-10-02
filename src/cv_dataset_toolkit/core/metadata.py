@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import UnidentifiedImageError
 
 from cv_dataset_toolkit.core.record import ImageRecord
+from cv_dataset_toolkit.utils.decorators import timed
 
 
 class _MetadataReader:
@@ -23,6 +24,7 @@ class _MetadataReader:
     def __init__(self) -> None:
         self.skipped: int = 0
 
+    @timed
     def __call__(self, paths: Iterable[Path]) -> Iterator[ImageRecord]:
         """Yield one `ImageRecord` per readable image in `paths`.
 

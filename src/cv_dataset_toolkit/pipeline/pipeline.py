@@ -9,6 +9,7 @@ from typing import Self, overload
 from cv_dataset_toolkit.core.protocols import RecordSource
 from cv_dataset_toolkit.core.record import ImageRecord
 from cv_dataset_toolkit.pipeline.transforms import Transform
+from cv_dataset_toolkit.utils.decorators import timed
 
 
 @dataclass
@@ -49,6 +50,7 @@ class Pipeline:
         """Return a *new* Pipeline with `step` appended. Does not mutate `self`."""
         return type(self)((*self._steps, step))
 
+    @timed
     def run(
         self,
         records: RecordSource,

@@ -70,9 +70,7 @@ def load_config(path: Path | None, overrides: Mapping[str, object]) -> PipelineC
 
     env_settings = _CVTKEnvSettings()
     env_data = {
-        field: value
-        for field, value in env_settings.model_dump().items()
-        if value is not None
+        field: value for field, value in env_settings.model_dump().items() if value is not None
     }
     _deep_update(merged, env_data)
     _deep_update(merged, overrides)

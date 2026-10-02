@@ -22,6 +22,8 @@ from cv_dataset_toolkit.io.manifest import validate_manifest_csv
 from cv_dataset_toolkit.io.walker import iter_image_paths
 from cv_dataset_toolkit.pipeline.factory import build_pipeline
 from cv_dataset_toolkit.pipeline.pipeline import PipelineStats
+from cv_dataset_toolkit.utils.contexts import Stopwatch
+from cv_dataset_toolkit.utils.decorators import DEFAULT_TIMING_REGISTRY
 from cv_dataset_toolkit.utils.iterutils import batched
 
 
@@ -88,6 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Manifest format when writing output (config/model default: csv).",
     )
+    scan_parser.add_argument(
+        "--timings",
+        action="store_true",
+        help="Print execution timing table for pipeline stages.",
+    )
 
     validate_parser = subparsers.add_parser(
         "validate-manifest", help="Validate a manifest CSV row-by-row against ManifestRow."
@@ -151,37 +158,39 @@ def _with_progress(records: Iterable[ImageRecord], batch_size: int) -> Iterator[
         yield from batch
 
 
-def run_scan(config: PipelineConfig) -> int:
+def run_scan(config: PipelineConfig, timings: bool = False) -> int:
     """Single lazy pass: walk -> metadata -> pipeline -> stats/label-count -> optional export."""
-    paths: Iterator[Path] = iter_image_paths(config.root)
-    if config.limit is not None:
-        paths = islice(paths, config.limit)
+    DEFAULT_TIMING_REGISTRY.clear()
+    with Stopwatch() as sw:
+        paths: Iterator[Path] = iter_image_paths(config.root)
+        if config.limit is not None:
+            paths = islice(paths, config.limit)
 
-    records = iter_metadata(paths)
+        records = iter_metadata(paths)
 
-    pipeline = build_pipeline(config)
-    pipeline_stats = PipelineStats()
-    piped = pipeline.run(records, pipeline_stats)
+        pipeline = build_pipeline(config)
+        pipeline_stats = PipelineStats()
+        piped = pipeline.run(records, pipeline_stats)
 
-    stats = running_stats()
-    next(stats)  # prime: advance the coroutine to its first `yield`
-    label_counts: Counter[str] = Counter()
-    tracked = _tracked_records(piped, stats, label_counts)
+        stats = running_stats()
+        next(stats)  # prime: advance the coroutine to its first `yield`
+        label_counts: Counter[str] = Counter()
+        tracked = _tracked_records(piped, stats, label_counts)
 
-    reported = _with_progress(tracked, config.batch_size)
+        reported = _with_progress(tracked, config.batch_size)
 
-    try:
-        if config.output is not None:
-            exporter: Exporter = (
-                CSVExporter() if config.output.format == "csv" else JSONLinesExporter()
-            )
-            total = exporter.export(reported, config.output.path)
-        else:
-            total = sum(1 for _ in reported)
-    finally:
-        stats.close()
+        try:
+            if config.output is not None:
+                exporter: Exporter = (
+                    CSVExporter() if config.output.format == "csv" else JSONLinesExporter()
+                )
+                total = exporter.export(reported, config.output.path)
+            else:
+                total = sum(1 for _ in reported)
+        finally:
+            stats.close()
 
-    print(f"\ntotal records: {total}")
+    print(f"\ntotal records: {total} (elapsed: {sw.elapsed:.4f}s)")
     if iter_metadata.skipped:
         print(f"skipped (unreadable): {iter_metadata.skipped}")
     if config.output is not None:
@@ -194,6 +203,10 @@ def run_scan(config: PipelineConfig) -> int:
     if len(pipeline):
         print("\npipeline stats:")
         print(pipeline_stats.table())
+
+    if timings:
+        print("\ntimings:")
+        print(DEFAULT_TIMING_REGISTRY.table())
 
     return total
 
@@ -226,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
                 loc = ".".join(str(part) for part in error["loc"])
                 print(f"  {loc}: {error['msg']}", file=sys.stderr)
             return 2
-        run_scan(config)
+        run_scan(config, timings=bool(getattr(args, "timings", False)))
         return 0
 
     if args.command == "validate-manifest":
